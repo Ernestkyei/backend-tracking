@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "TrackStatus" ADD VALUE 'OUT_FOR_DELIVERY';

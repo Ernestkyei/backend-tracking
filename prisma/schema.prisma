@@ -1,0 +1,220 @@
+// ============================================================
+// Generator & Datasource
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// Enums
+// ============================================================
+
+enum Role {
+  ADMIN
+  DRIVER
+  CUSTOMER
+}
+
+enum TrackStatus {
+  PENDING
+  ASSIGNED
+  PICKED_UP
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  FAILED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PackageType {
+  DOCUMENTS
+  ELECTRONICS
+  CLOTHING
+  FOOD
+  GIFTS
+  OTHER
+}
+
+enum DeliveryUrgency {
+  STANDARD
+  EXPRESS
+  SAME_DAY
+}
+
+// ============================================================
+// Models
+// ============================================================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  phone     String?
+  role      Role     @default(CUSTOMER)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  sentShipments    Track[] @relation("SentShipments")
+  driverShipments  Track[] @relation("DriverShipments")
+  deliveries       Delivery[]
+  location         DriverLocation?
+}
+
+model DriverLocation {
+  id          String   @id @default(cuid())
+  latitude    Float
+  longitude   Float
+  isAvailable Boolean  @default(true)
+  lastUpdated DateTime @default(now())
+  driverId    String   @unique
+  driver      User     @relation(fields: [driverId], references: [id], onDelete: Cascade)
+}
+
+model Track {
+  id              String      @id @default(cuid())
+  trackingNumber  String      @unique
+  status          TrackStatus @default(PENDING)
+  currentLocation String
+  pickupAddress   String
+  deliveryAddress String
+  description     String?
+  weight          Float?
+  price           Float?
+  expectedDelivery DateTime?
+  actualDelivery   DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  // ============================================================
+  // SENDER INFORMATION (Made optional to work with existing data)
+  // ============================================================
+  senderName      String?     // Name of person sending
+  senderEmail     String?     // Email of sender
+  senderPhone     String?     // Phone of sender
+  senderId        String?     // Reference to User if registered
+  
+  // ============================================================
+  // RECIPIENT INFORMATION
+  // ============================================================
+  recipientName   String?     // Name of person receiving
+  recipientPhone  String?     // Phone of recipient
+  recipientEmail  String?     // Email of recipient
+  recipientId     String?     // Reference to User if registered
+  
+  // ============================================================
+  // LEGACY FIELDS (Keep for existing data)
+  // ============================================================
+  customerName    String?
+  customerEmail   String?
+  customerPhone   String?
+  customerId      String?
+  
+  // Location details
+  pickupRegion    String?
+  deliveryRegion  String?
+  landmark        String?
+  
+  // Package details
+  packageType        PackageType?   @default(OTHER)
+  specialInstructions String?
+  deliveryUrgency    DeliveryUrgency? @default(STANDARD)
+  additionalNotes    String?
+  preferredPickupTime String?
+  
+  // Driver assignment
+  driverId        String?
+  
+  // Relations
+  sender          User?       @relation("SentShipments", fields: [senderId], references: [id], onDelete: SetNull)
+  driver          User?       @relation("DriverShipments", fields: [driverId], references: [id], onDelete: SetNull)
+  locationUpdates LocationUpdate[]
+  delivery        Delivery?
+  
+  // Payment fields
+  paymentStatus   PaymentStatus @default(PENDING)
+  paymentMethod   String?
+  paymentId       String?
+  paidAt          DateTime?
+  
+  // QR Code relations
+  qrCode          QRCode?
+  qrScans         QRScan[]
+}
+
+model LocationUpdate {
+  id             String      @id @default(cuid())
+  location       String
+  latitude       Float?
+  longitude      Float?
+  status         TrackStatus
+  note           String?
+  timestamp      DateTime    @default(now())
+  trackingNumber String
+  track          Track       @relation(fields: [trackingNumber], references: [trackingNumber], onDelete: Cascade)
+}
+
+model Delivery {
+  id                String    @id @default(cuid())
+  assignedAt        DateTime  @default(now())
+  startedAt         DateTime?
+  completedAt       DateTime?
+  proofImage        String?
+  customerSignature String?
+  notes             String?
+  trackingNumber    String    @unique
+  driverId          String
+  track             Track     @relation(fields: [trackingNumber], references: [trackingNumber], onDelete: Cascade)
+  driver            User      @relation(fields: [driverId], references: [id])
+}
+
+// ============================================================
+// QR Code Models
+// ============================================================
+
+model QRCode {
+  id             String    @id @default(cuid())
+  trackingNumber String    @unique
+  qrCodeUrl      String
+  qrCodeText     String
+  size           Int       @default(300)
+  format         String    @default("png")
+  expiresAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  scanCount      Int       @default(0)
+  lastScannedAt  DateTime?
+  
+  // Relations
+  track          Track     @relation(fields: [trackingNumber], references: [trackingNumber], onDelete: Cascade)
+}
+
+model QRScan {
+  id             String    @id @default(cuid())
+  trackingNumber String
+  scannedAt      DateTime  @default(now())
+  scannerIp      String?
+  scannerDevice  String?
+  scannerLocation String?
+  latitude       Float?
+  longitude      Float?
+  scanStatus     String    @default("success")
+  
+  // Relations
+  track          Track     @relation(fields: [trackingNumber], references: [trackingNumber], onDelete: Cascade)
+}
