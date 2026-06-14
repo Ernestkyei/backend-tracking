@@ -36,6 +36,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@rollup/plugin-strip": "^3.0.4",
     "@types/bcrypt": "^6.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
